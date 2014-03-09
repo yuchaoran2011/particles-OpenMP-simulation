@@ -69,14 +69,16 @@ int main( int argc, char **argv )
         while( fscanf (fread,"%d %d %lf",&n[count],&p[count],&t[count]) != EOF )
           count++;
       }
- 
+
+      printf("count: %d\n", count);
+
       num = count/2;
  
       ss[0] = sse[0] = ws[0] = t[0]/t[1];
       for (i=2; i<=num;i++) {
-         ss[i-1] = t[0]/t[i];
-		 sse[i-1] = ss[i-1]/p[i];
-         ws[i-1] = t[0]/t[i+num-1];
+          ss[i-1] = t[0]/t[i];
+		      sse[i-1] = ss[i-1]/p[i];
+          ws[i-1] = t[0]/t[i+num-1];
       }
  
       printf("\nStrong scaling estimates are :\n");

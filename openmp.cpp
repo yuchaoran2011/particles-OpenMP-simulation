@@ -163,6 +163,8 @@ void apply_force_for_bin(bin_t* boxes, int r, int c)
 
 int main( int argc, char **argv )
 {   
+    int numthreads;
+
     if( find_option( argc, argv, "-h" ) >= 0 )
     {
         printf( "Options:\n" );
@@ -177,14 +179,14 @@ int main( int argc, char **argv )
     int n = read_int( argc, argv, "-n", 1000 );
 
     char *savename = read_string( argc, argv, "-o", NULL );
+    char *sumname = read_string( argc, argv, "-s", NULL );
     FILE *fsave = savename ? fopen( savename, "w" ) : NULL;
+    FILE *fsum = sumname ? fopen ( sumname, "a" ) : NULL; 
     
     particle_t *particles = (particle_t*) malloc( n * sizeof(particle_t) );
     set_size( n );
 
     assert( bin_size > 2*cutoff );
-
-    printf("%d\n", n);
 
     init_particles( n, particles );
 
@@ -201,41 +203,58 @@ int main( int argc, char **argv )
     #pragma omp parallel
     for( int step = 0; step < NSTEPS; step++ )
     {
-        #pragma omp for
-        for(int i = 0; i < NUM_BINS; i++) {
-            int r = i/NUM_BINS_PER_SIDE;
-            int c = i % NUM_BINS_PER_SIDE;
-            apply_force_for_bin(bins, r, c); 
-        }
-
-        #pragma omp for
-        for( int i = 0; i < n; i++ ) 
+        numthreads = omp_get_num_threads();
         {
-            move( particles[i] );
-        }
-
-        #pragma omp single
-        {
-            init_bins( bins ); 
-            for( int i = 0; i < n; i++ ) { 
-                bin_particle(particles[i], bins);
+            #pragma omp for
+            for(int i = 0; i < NUM_BINS; i++) {
+                int r = i/NUM_BINS_PER_SIDE;
+                int c = i % NUM_BINS_PER_SIDE;
+                apply_force_for_bin(bins, r, c); 
             }
 
-            if( fsave && (step%SAVEFREQ) == 0 )
+            #pragma omp for
+            for( int i = 0; i < n; i++ ) 
             {
-                save( fsave, n, particles );
+                move( particles[i] );
+            }
+
+            #pragma omp single
+            {
+                init_bins( bins ); 
+                for( int i = 0; i < n; i++ ) { 
+                    bin_particle(particles[i], bins);
+                }
+
+                if( fsave && (step%SAVEFREQ) == 0 )
+                {
+                    save( fsave, n, particles );
+                }
             }
         }
     }
 
     simulation_time = read_timer( ) - simulation_time;
-    
-    printf( "n = %d, simulation time = %g seconds\n", n, simulation_time );
+
+    printf( "n = %d,threads = %d, simulation time = %g seconds", n,numthreads, simulation_time);
+    printf("\n");
+
+    if (fsum) 
+    {
+        fprintf(fsum, "%d %d %g\n", n, numthreads, simulation_time);
+    }
+
+    //
+    // Clearing space
+    //
+    if( fsum ) {
+        fclose( fsum );
+    }
 
     init_bins( bins );   
     free( particles );
     delete[] ( bins );
-    if( fsave ) {
+    if( fsave ) 
+    {
         fclose( fsave );
     }
     
